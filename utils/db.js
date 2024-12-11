@@ -1,47 +1,72 @@
-import mongodb from 'mongodb';
+/* MongoDB client class */
+import { MongoClient, ObjectId } from 'mongodb';
 
-import Collection from 'mongodb/lib/collection';
-import envLoader from './env_loader';
-
-/* Represent MongoDB client */
 class DBClient {
-  /* Create new DBClient instance */
   constructor() {
-    envLoader();
-    const host = process.env.DB_HOST || 'localhost';
-    const port = process.env.DB_PORT || 27017;
-    const database = process.env.DB_DATABASE || 'files_manager';
-    const dbURL = `mongodb://${host}:${port}/${database}`;
-
-    this.client = new mongodb.MongoClient(dbURL, { useUnifiedTopology: true });
-    this.client.connect();
+    const DB_PORT = process.env.DB_PORT || '27017';
+    const DB_HOST = process.env.DB_HOST || 'localhost';
+    const DB_DATABASE = process.env.DB_DATABASE || 'files_manager';
+    const DB_URL = `mongodb://${DB_HOST}:${DB_PORT}`;
+    this._client = new MongoClient(DB_URL);
+    this.connected = false;
+    (async () => {
+      try {
+        await this._client.connect();
+        this.connected = true;
+        this._db = this._client.db(DB_DATABASE);
+        await this._db.collection('users').createIndex({ email: 1 }, { unique: true });
+      } catch (error) {
+        console.log(error);
+      }
+    })();
   }
 
-  /** Check if this client's connection to MongoDB server is active */
   isAlive() {
-    return this.client.isConnected();
+    return this.connected;
   }
 
-  /** Retrieves the number of users in database */
-  async nbUsers() {
-    return this.client.db().collection('users').countDocuments();
+  async nbUsers(query = {}) {
+    return this._db.collection('users').countDocuments(query);
   }
 
-  /** Retrieve the number of files in database */
-  async nbFiles() {
-    return this.client.db().collection('files').countDocuments();
+  async nbFiles(query = {}) {
+    return this._db.collection('files').countDocuments(query);
   }
 
-  /** Retrieve reference to users collection */
-  async usersCollection() {
-    return this.client.db().collection('users');
+  async insertOne(collection, data) {
+    return this._db.collection(collection).insertOne(data);
   }
 
-  /** Retrieve reference to files collection */
-  async filesCollection() {
-    return this.client.db().collection('files');
+  async findOne(collection, data) {
+    return this._db.collection(collection).findOne(data);
+  }
+
+  async updateOne(collection, filter, updateDoc) {
+    return this._db.collection(collection).updateOne(filter, updateDoc);
+  }
+
+  async listFiles(data) {
+    let pipeline = [];
+    const { userId, page } = data;
+    let { parentId } = data;
+    if (parentId === undefined) {
+      pipeline = [
+        { $match: { userId: ObjectId(userId) } },
+        { $facet: { data: [{ $skip: page * 20 }, { $limit: 20 }] } },
+      ];
+    } else {
+      if (parentId !== '0') {
+        parentId = ObjectId(parentId);
+      }
+      pipeline = [
+        { $match: { userId: ObjectId(userId), parentId } },
+        { $facet: { data: [{ $skip: page * 20 }, { $limit: 20 }] } },
+      ];
+    }
+    return this._db.collection('files').aggregate(pipeline).toArray();
   }
 }
 
-export const dbClient = new DBClient();
-export default dbClient;
+const dbClient = new DBClient();
+
+module.exports = dbClient;
