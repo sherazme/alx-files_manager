@@ -1,13 +1,24 @@
-/* Redis and Datbase status check and collections count */
+import redisClient from '../utils/redis';
 import dbClient from '../utils/db';
-import redisCleint from '../utils/redis';
 
-const getStatus = (req, res) => {
-  res.status(200).json({ redis: redisCleint.isAlive(), db: dbClient.isAlive() });
-};
+class AppController {
+  /* return if Redis is alive and if the DB is alive too */
+  static getStatus(request, response) {
+    const status = {
+      redis: redisClient.isAlive(),
+      db: dbClient.isAlive(),
+    };
+    response.status(200).send(status);
+  }
 
-const getStats = async (req, res) => {
-  res.status(200).json({ users: await dbClient.nbUsers(), files: await dbClient.nbFiles() });
-};
+  /* return the number of users and files in DB*/
+  static async getStats(request, response) {
+    const stats = {
+      users: await dbClient.nbUsers(),
+      files: await dbClient.nbFiles(),
+    };
+    response.status(200).send(stats);
+  }
+}
 
-module.exports = { getStats, getStatus };
+export default AppController;
