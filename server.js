@@ -1,17 +1,14 @@
-/* Application entry point */
 import express from 'express';
-import router from './routes/index';
-
-const PORT = process.env.PORT ? process.env.PORT : 5000;
+import controllerRouting from './routes/index';
 
 const app = express();
+const port = process.env.PORT || 5000;
 
 app.use(express.json());
+controllerRouting(app);
 
-app.use('/', router);
-
-app.listen(PORT, () => {
-  console.log(`Express server is live on port ${PORT}`);
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
 });
 
 export default app;
